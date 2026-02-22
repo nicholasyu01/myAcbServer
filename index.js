@@ -186,6 +186,70 @@ app.post('/batch', upload.single('file'), async (req, res) => {
     return res.json({ arrivalDate, results });
 });
 
+// POST /batchjson - accept JSON body { arrivalDate: 'YYYY-MM-DD', items: [{ ticker, shares }, ...] }
+app.post('/batchjson', async (req, res) => {
+    const arrivalDate = req.body && req.body.arrivalDate;
+    const items = req.body && req.body.items;
+    if (!arrivalDate) return res.status(400).json({ error: 'Missing `arrivalDate` (YYYY-MM-DD) in JSON body.' });
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Missing `items` array in JSON body. Example: { arrivalDate: "2026-01-06", items: [{ "ticker":"AAPL", "shares":2 }] }' });
+
+    // helper: format Date -> YYYY-MM-DD
+    const toYMD = (d) => d.toISOString().slice(0, 10);
+
+    // Yahoo-only findTradingDay (no Alpha fallback)
+    async function findTradingDayYahooOnly(tickerSymbol, targetYMD, maxLookbackDays = 14) {
+        const target = new Date(targetYMD + 'T00:00:00Z');
+        for (let i = 0; i <= maxLookbackDays; i++) {
+            const d = new Date(target);
+            d.setUTCDate(target.getUTCDate() - i);
+            const dateStr = toYMD(d);
+            const dNext = new Date(d);
+            dNext.setUTCDate(d.getUTCDate() + 1);
+            const dateNextStr = toYMD(dNext);
+            try {
+                const yf = new yahooFinance({ suppressNotices: ['ripHistorical'] }) // DO NOT REMOVE
+
+                const arr = await yf.historical(tickerSymbol, { period1: dateStr, period2: dateNextStr, interval: '1d' });
+                if (arr && arr.length > 0) {
+                    const item = arr[arr.length - 1];
+                    return { date: dateStr, close: item.close ?? null, adjClose: item.adjClose ?? item.adjclose ?? item.adj_close ?? null, provider: 'yahoo' };
+                }
+            } catch (e) {
+                console.error('Yahoo historical attempt failed for', tickerSymbol, dateStr, e && e.message ? e.message : e);
+                // continue lookback
+            }
+        }
+        return null;
+    }
+
+    const results = [];
+    for (const it of items) {
+        if (!it || !it.ticker) {
+            results.push({ input: it, error: 'Missing ticker' });
+            continue;
+        }
+        const ticker = String(it.ticker).trim().toUpperCase();
+        const shares = Number(it.shares);
+        if (!Number.isFinite(shares) || shares <= 0) {
+            results.push({ ticker, shares: it.shares, error: 'Invalid shares' });
+            continue;
+        }
+        try {
+            const found = await findTradingDayYahooOnly(ticker, arrivalDate, 30);
+            if (!found) {
+                results.push({ ticker, shares, error: 'No trading day found within lookback window' });
+                continue;
+            }
+            const adjustedCostBasis = (found.adjClose !== null && found.adjClose !== undefined) ? found.adjClose * shares : null;
+            results.push({ ticker, shares, tradedDate: found.date, adjustedClose: found.adjClose, adjustedCostBasis, provider: 'yahoo' });
+        } catch (err) {
+            results.push({ ticker, shares, error: String(err) });
+        }
+    }
+
+    return res.json({ arrivalDate, results });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
