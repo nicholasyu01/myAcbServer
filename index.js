@@ -102,9 +102,6 @@ app.post('/price', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
-
 // POST /batch - upload CSV with lines: TICKER,SHARES
 // Form: multipart/form-data with `file` (CSV) and `arrivalDate` field (YYYY-MM-DD)
 app.post('/batch', upload.single('file'), async (req, res) => {
@@ -188,3 +185,7 @@ app.post('/batch', upload.single('file'), async (req, res) => {
 
     return res.json({ arrivalDate, results });
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+
