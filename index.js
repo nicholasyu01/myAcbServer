@@ -6,7 +6,10 @@ const app = express();
 app.use(express.json());
 const cors = require('cors');
 app.use(cors({
-    origin: 'http://localhost:5175',
+    origin: [
+        'http://localhost:5173',
+        'https://my-acb-app-123-mwyslcm8z-nicholasyu01s-projects.vercel.app'
+    ],
     methods: ['GET', 'POST', 'OPTIONS'],
 }));
 const multer = require('multer');
