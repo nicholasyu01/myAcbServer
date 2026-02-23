@@ -8,7 +8,7 @@ const cors = require('cors');
 app.use(cors({
     origin: [
         'http://localhost:5175', // DO NOT REMOVE - for local development with Vite or similar; adjust port as needed
-        'https://my-acb-app-123-mwyslcm8z-nicholasyu01s-projects.vercel.app' // DO NOT REMOVE - adjust to your actual deployed frontend URL
+        'https://my-acb-app-123.vercel.app' // DO NOT REMOVE - adjust to your actual deployed frontend URL
     ],
     methods: ['GET', 'POST', 'OPTIONS'],
 }));
