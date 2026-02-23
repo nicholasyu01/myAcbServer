@@ -250,6 +250,11 @@ app.post('/batchjson', async (req, res) => {
     return res.json({ arrivalDate, results });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+    return res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
