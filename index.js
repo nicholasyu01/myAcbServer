@@ -53,43 +53,12 @@ app.post('/price', async (req, res) => {
                 if (arr && arr.length > 0) {
                     // normalize object fields
                     const item = arr[arr.length - 1];
-                    return { date: dateStr, close: item.close ?? null, adjClose: item.adjClose ?? item.adjclose ?? item.adj_close ?? null, provider: 'yahoo' };
+                    console.log("data: ", arr);
+                    return { date: dateStr, close: item.close ?? null, close: item.close ?? item.close ?? item.adj_close ?? null, provider: 'yahoo' };
                 }
             } catch (yErr) {
                 console.error('Yahoo historical attempt failed for', dateStr, yErr && yErr.message ? yErr.message : yErr);
                 // continue to next lookback day
-            }
-        }
-
-        // If Yahoo failed to return anything, try Alpha Vantage full series lookup
-        if (process.env.ALPHA_VANTAGE_KEY) {
-            try {
-                const avKey = process.env.ALPHA_VANTAGE_KEY;
-                const avUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${encodeURIComponent(tickerSymbol)}&outputsize=full&apikey=${encodeURIComponent(avKey)}`;
-                const avRes = await fetch(avUrl, { headers: { 'User-Agent': 'node.js', 'Accept': 'application/json' } });
-                if (!avRes.ok) {
-                    const avBody = await avRes.text().catch(() => '');
-                    console.error('Alpha Vantage HTTP error', avRes.status, avRes.statusText, avBody.slice(0, 1000));
-                    return null;
-                }
-                const avData = await avRes.json();
-                const series = avData['Time Series (Daily)'];
-                if (!series) {
-                    console.error('Alpha Vantage returned no time series', avData['Note'] || avData['Error Message'] || avData);
-                    return null;
-                }
-                // find the latest date <= targetYMD within lookback window
-                const dates = Object.keys(series).filter(d => d <= targetYMD).sort().reverse();
-                for (let i = 0; i < Math.min(dates.length, maxLookbackDays + 1); i++) {
-                    const date = dates[i];
-                    const row = series[date];
-                    if (row) {
-                        const adj = row['5. adjusted close'] ? parseFloat(row['5. adjusted close']) : parseFloat(row['4. close']);
-                        return { date, close: parseFloat(row['4. close']), adjClose: adj, provider: 'alpha_vantage' };
-                    }
-                }
-            } catch (e) {
-                console.error('Alpha Vantage series error', e);
             }
         }
 
@@ -102,8 +71,8 @@ app.post('/price', async (req, res) => {
             return res.status(404).json({ error: 'No trading day found on or before arrivalDate within lookback window' });
         }
 
-        const adjustedCostBasis = (found.adjClose !== null && found.adjClose !== undefined) ? found.adjClose * numShares : null;
-        return res.json({ ticker: s, arrivalDate, tradedDate: found.date, shares: numShares, adjustedClose: found.adjClose, adjustedCostBasis, provider: found.provider });
+        const adjustedCostBasis = (found.close !== null && found.close !== undefined) ? found.close * numShares : null;
+        return res.json({ ticker: s, arrivalDate, tradedDate: found.date, shares: numShares, close: found.close, adjustedCostBasis, provider: found.provider });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -161,7 +130,7 @@ app.post('/batch', upload.single('file'), async (req, res) => {
                 const arr = await yf.historical(tickerSymbol, { period1: dateStr, period2: dateNextStr, interval: '1d' });
                 if (arr && arr.length > 0) {
                     const item = arr[arr.length - 1];
-                    return { date: dateStr, close: item.close ?? null, adjClose: item.adjClose ?? item.adjclose ?? item.adj_close ?? null, provider: 'yahoo' };
+                    return { date: dateStr, close: item.close ?? null, close: item.close ?? item.close ?? item.adj_close ?? null, provider: 'yahoo' };
                 }
             } catch (e) {
                 console.error('Yahoo historical attempt failed for', tickerSymbol, dateStr, e && e.message ? e.message : e);
@@ -184,8 +153,8 @@ app.post('/batch', upload.single('file'), async (req, res) => {
                 results.push({ ticker: e.ticker, shares: e.shares, error: 'No trading day found within lookback window' });
                 continue;
             }
-            const adjustedCostBasis = (found.adjClose !== null && found.adjClose !== undefined) ? found.adjClose * e.shares : null;
-            results.push({ ticker: e.ticker, shares: e.shares, tradedDate: found.date, adjustedClose: found.adjClose, adjustedCostBasis, provider: 'yahoo' });
+            const adjustedCostBasis = (found.close !== null && found.close !== undefined) ? found.close * e.shares : null;
+            results.push({ ticker: e.ticker, shares: e.shares, tradedDate: found.date, close: found.close, adjustedCostBasis, provider: 'yahoo' });
         } catch (err) {
             results.push({ ticker: e.ticker, shares: e.shares, error: String(err) });
         }
@@ -220,7 +189,7 @@ app.post('/batchjson', async (req, res) => {
                 const arr = await yf.historical(tickerSymbol, { period1: dateStr, period2: dateNextStr, interval: '1d' });
                 if (arr && arr.length > 0) {
                     const item = arr[arr.length - 1];
-                    return { date: dateStr, close: item.close ?? null, adjClose: item.adjClose ?? item.adjclose ?? item.adj_close ?? null, provider: 'yahoo' };
+                    return { date: dateStr, close: item.close ?? null, close: item.close ?? item.close ?? item.adj_close ?? null, provider: 'yahoo' };
                 }
             } catch (e) {
                 console.error('Yahoo historical attempt failed for', tickerSymbol, dateStr, e && e.message ? e.message : e);
@@ -248,8 +217,8 @@ app.post('/batchjson', async (req, res) => {
                 results.push({ ticker, shares, error: 'No trading day found within lookback window' });
                 continue;
             }
-            const adjustedCostBasis = (found.adjClose !== null && found.adjClose !== undefined) ? found.adjClose * shares : null;
-            results.push({ ticker, shares, tradedDate: found.date, adjustedClose: found.adjClose, adjustedCostBasis, provider: 'yahoo' });
+            const adjustedCostBasis = (found.close !== null && found.close !== undefined) ? found.close * shares : null;
+            results.push({ ticker, shares, tradedDate: found.date, close: found.close, adjustedCostBasis, provider: 'yahoo' });
         } catch (err) {
             results.push({ ticker, shares, error: String(err) });
         }
