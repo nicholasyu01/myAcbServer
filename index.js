@@ -4,6 +4,11 @@ const yahooFinance = (require("yahoo-finance2").default || require("yahoo-financ
 
 const app = express();
 app.use(express.json());
+const cors = require('cors');
+app.use(cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'OPTIONS'],
+}));
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
